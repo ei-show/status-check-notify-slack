@@ -1,0 +1,36 @@
+steps:
+  # go build
+  - name: 'golang:1.20-buster'
+    entrypoint: '/bin/bash'
+    dir: 'src/'
+    args:
+      - -c
+      - |
+        go mod download
+        go mod tidy
+        CGO_ENABLED=0 GOOS=linux go build -o main ./main.go
+  # docker build
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build',
+          '-t', 'asia-northeast1-docker.pkg.dev/$PROJECT_ID/blcloud-infra/gce-vulns-report-dd:$TAG_NAME',
+          '-t', 'asia-northeast1-docker.pkg.dev/$PROJECT_ID/blcloud-infra/gce-vulns-report-dd:latest',
+          '--cache-from', 'asia-northeast1-docker.pkg.dev/$PROJECT_ID/blcloud-infra/gce-vulns-report-dd:latest',
+          '-f', 'Dockerfile.slim',
+          '.'
+    ]
+  # docker push
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', '-a', 'asia-northeast1-docker.pkg.dev/$PROJECT_ID/blcloud-infra/gce-vulns-report-dd']
+  # gcloud job create
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args: ['run', 'jobs', 'create', 'gce-vulns-report-dd', '--project=$PROJECT_ID', '--region=asia-northeast1',
+          '--image=asia-northeast1-docker.pkg.dev/$PROJECT_ID/blcloud-infra/gce-vulns-report-dd',
+          # サービスアカウントの指定
+          # シークレットの指定
+          # 環境変数
+          # 並列数
+          '--execute-now', '--async'
+          ]
+images:
+  - asia-northeast1-docker.pkg.dev/$PROJECT_ID/blcloud-infra/gce-vulns-report-dd
