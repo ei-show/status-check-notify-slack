@@ -4,62 +4,56 @@ import (
 	"errors"
 	"fmt"
 	"github.com/slack-go/slack"
+	"log"
 	"net/http"
 	"os"
 )
 
-// get Environment Variables URL
-func getUrl() (string, error) {
+// Config is the configuration for the job.
+type Config struct {
+	url            string // URL
+	slackApiToken  string // SLACK_API_TOKEN
+	slackChannelId string // SLACK_CHANNEL_ID
+}
+
+// get Environment Variables
+func configFromEnv() (Config, error) {
 	url := os.Getenv("URL")
-	if url == "" {
-		return "", errors.New("URL is not set")
-	}
-	return url, nil
-}
-
-// get Environment Variables SLACK_API_TOKEN
-func getSlackApiToken() (string, error) {
 	slackApiToken := os.Getenv("SLACK_API_TOKEN")
-	if slackApiToken == "" {
-		return "", errors.New("SLACK_API_TOKEN is not set")
-	}
-	return slackApiToken, nil
-}
-
-// get Environment Variables SLACK_API_TOKEN
-func getSlackChannelId() (string, error) {
 	slackChannelId := os.Getenv("SLACK_CHANNEL_ID")
-	if slackChannelId == "" {
-		return "", errors.New("SLACK_CHANNEL_ID is not set")
+
+	// set config from Environment Variables
+	config := Config{
+		url:            url,
+		slackApiToken:  slackApiToken,
+		slackChannelId: slackChannelId,
 	}
-	return slackChannelId, nil
+
+	// check Environment Variables
+	if config.url == "" {
+		return config, errors.New("URL is not set")
+	}
+	if config.slackApiToken == "" {
+		return config, errors.New("SLACK_API_TOKEN is not set")
+	}
+	if config.slackChannelId == "" {
+		return config, errors.New("SLACK_CHANNEL_ID is not set")
+	}
+
+	return config, nil
 }
 
 func main() {
 	// check Environment Variables
-	url, err := getUrl()
+	config, err := configFromEnv()
 	if err != nil {
-		fmt.Printf("get Environment Variables: %s\n", err)
-		return
-	}
-
-	slackApiToken, err := getSlackApiToken()
-	if err != nil {
-		fmt.Printf("get Environment Variables: %s\n", err)
-		return
-	}
-
-	slackChannelId, err := getSlackChannelId()
-	if err != nil {
-		fmt.Printf("get Environment Variables: %s\n", err)
-		return
+		log.Fatalf("{Environment variables error: %v }", err)
 	}
 
 	// check status code
-	resp, err := http.Get(url)
+	resp, err := http.Get(config.url)
 	if err != nil {
-		fmt.Printf("Request error: %v\n", err)
-		return
+		log.Fatalf("{Request error: {message: %v, url: %v }}", err, config.url)
 	}
 	defer resp.Body.Close()
 
@@ -67,13 +61,18 @@ func main() {
 
 	// status code not 200
 	if resp.StatusCode != http.StatusOK {
-		fmt.Printf("Response error: %v\n", resp.Status)
-
-		// nortiry to slack
-		api := slack.New(slackApiToken)
+		// notiry to slack
+		api := slack.New(config.slackApiToken)
+		// Notification content
+		attachment := slack.Attachment{
+			Title: "サーバがダウンしました",
+			Color: "danger",
+			Text:  config.url,
+		}
 		channelID, timestamp, err := api.PostMessage(
-			slackChannelId,
-			slack.MsgOptionText("Hello world!", false),
+			config.slackChannelId,
+			// slack.MsgOptionText("Hello world!", false),
+			slack.MsgOptionAttachments(attachment),
 		)
 		if err != nil {
 			fmt.Printf("Slack Post Message Error %s\n", err)
