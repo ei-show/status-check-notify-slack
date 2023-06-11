@@ -71,7 +71,7 @@ func convertURLToFileName(inputURL string) string {
 	path := strings.ReplaceAll(parsedURL.Path, "/", "_")
 
 	// ファイル名を組み立て
-	fileName := fmt.Sprintf("%s%s.json", host, path)
+	fileName := fmt.Sprintf("%s%s.txt", host, path)
 
 	return fileName
 }
@@ -104,6 +104,19 @@ func readObject(ctx context.Context, obj *storage.ObjectHandle) ([]byte, error) 
 	return data, nil
 }
 
+// オブジェクトを更新する関数
+func updateObject(ctx context.Context, obj *storage.ObjectHandle, newContent []byte) error {
+	writer := obj.NewWriter(ctx)
+	_, err := writer.Write(newContent)
+	if err != nil {
+		return err
+	}
+	if err := writer.Close(); err != nil {
+		return err
+	}
+	return nil
+}
+
 // notify to slack
 func notifyToSlack(config Config, title string, color string) {
 	// notify to slack
@@ -134,20 +147,22 @@ func main() {
 		log.Fatalf("{Environment variables error: %v }\n", err)
 	}
 
+	// GCS clientの作成
+	ctx := context.Background()
+	client, err := storage.NewClient(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer client.Close()
+
+	// GCSで使用するオブジェクト名を生成する
+	objectName := convertURLToFileName(config.url)
+	obj := client.Bucket(config.bucketName).Object(objectName)
+
+	var objResponseStatus []byte
+
 	// config.bucketName が存在する場合は、GCSにアクセスする
 	if config.bucketName != "" {
-		// GCS clientの作成
-		ctx := context.Background()
-		client, err := storage.NewClient(ctx)
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer client.Close()
-
-		// GCSで使用するオブジェクト名を生成する
-		objectName := convertURLToFileName(config.url)
-		obj := client.Bucket(config.bucketName).Object(objectName)
-
 		// objectが存在するか確認する
 		_, err = obj.Attrs(ctx)
 		if err != nil {
@@ -163,8 +178,8 @@ func main() {
 			}
 		} else {
 			// オブジェクトが存在する場合は、読み込む
-			data, err := readObject(ctx, obj)
-			fmt.Printf("オブジェクトの内容: %s\n", data)
+			objResponseStatus, err = readObject(ctx, obj)
+			fmt.Printf("オブジェクトの内容: %s\n", objResponseStatus)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -180,11 +195,20 @@ func main() {
 
 	fmt.Printf("{Response: {url: %v, status: %v }}\n", config.url, resp.Status)
 
-	// status code not 200
 	if resp.StatusCode != http.StatusOK {
+		// status code not 200
 		notifyToSlack(config, "サーバがダウンしています", "danger")
+		if config.bucketName != "" {
+			updateObject(ctx, obj, []byte(resp.Status))
+		}
 	} else {
-		notifyToSlack(config, "サーバが復帰しました", "good")
+		// status code 200
+		if config.bucketName != "" {
+			if string(objResponseStatus) != resp.Status {
+				notifyToSlack(config, "サーバが復帰しました", "good")
+				updateObject(ctx, obj, []byte(resp.Status))
+			}
+		}
 	}
 
 }
