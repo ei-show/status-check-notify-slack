@@ -12,25 +12,15 @@ steps:
   # docker build
   - name: 'gcr.io/cloud-builders/docker'
     args: ['build',
-          '-t', 'asia-northeast1-docker.pkg.dev/$PROJECT_ID/blcloud-infra/gce-vulns-report-dd:$TAG_NAME',
-          '-t', 'asia-northeast1-docker.pkg.dev/$PROJECT_ID/blcloud-infra/gce-vulns-report-dd:latest',
-          '--cache-from', 'asia-northeast1-docker.pkg.dev/$PROJECT_ID/blcloud-infra/gce-vulns-report-dd:latest',
+          '-t', 'asia-northeast1-docker.pkg.dev/$PROJECT_ID/tools/status-check-notify-slack:$TAG_NAME',
+          '-t', 'asia-northeast1-docker.pkg.dev/$PROJECT_ID/tools/status-check-notify-slack:latest',
+          '--cache-from', 'asia-northeast1-docker.pkg.dev/$PROJECT_ID/tools/status-check-notify-slack:latest',
           '-f', 'Dockerfile.slim',
           '.'
     ]
   # docker push
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', '-a', 'asia-northeast1-docker.pkg.dev/$PROJECT_ID/blcloud-infra/gce-vulns-report-dd']
-  # gcloud job create
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    entrypoint: gcloud
-    args: ['run', 'jobs', 'create', 'gce-vulns-report-dd', '--project=$PROJECT_ID', '--region=asia-northeast1',
-          '--image=asia-northeast1-docker.pkg.dev/$PROJECT_ID/blcloud-infra/gce-vulns-report-dd',
-          # サービスアカウントの指定
-          # シークレットの指定
-          # 環境変数
-          # 並列数
-          '--execute-now', '--async'
-          ]
+    args: ['push', '-a', 'asia-northeast1-docker.pkg.dev/$PROJECT_ID/tools/status-check-notify-slack']
+
 images:
-  - asia-northeast1-docker.pkg.dev/$PROJECT_ID/blcloud-infra/gce-vulns-report-dd
+  - asia-northeast1-docker.pkg.dev/$PROJECT_ID/tools/status-check-notify-slack

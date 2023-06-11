@@ -47,17 +47,17 @@ func main() {
 	// check Environment Variables
 	config, err := configFromEnv()
 	if err != nil {
-		log.Fatalf("{Environment variables error: %v }", err)
+		log.Fatalf("{Environment variables error: %v }\n", err)
 	}
 
 	// check status code
 	resp, err := http.Get(config.url)
 	if err != nil {
-		log.Fatalf("{Request error: {message: %v, url: %v }}", err, config.url)
+		log.Fatalf("{Request error: {message: %v, url: %v }}\n", err, config.url)
 	}
 	defer resp.Body.Close()
 
-	fmt.Printf("Response status: %v\n", resp.Status)
+	fmt.Printf("{Response: {url: %v, status: %v }}\n",config.url, resp.Status)
 
 	// status code not 200
 	if resp.StatusCode != http.StatusOK {
@@ -79,7 +79,7 @@ func main() {
 			return
 		}
 
-		fmt.Printf("Message successfully sent to channel %s at %s", channelID, timestamp)
+		fmt.Printf("Message successfully sent to channel %s at %s\n", channelID, timestamp)
 
 	}
 
