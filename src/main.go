@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/slack-go/slack"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
@@ -88,6 +89,44 @@ func createObject(ctx context.Context, obj *storage.ObjectHandle, data []byte) e
 	return nil
 }
 
+// オブジェクトの内容を読み込む関数
+func readObject(ctx context.Context, obj *storage.ObjectHandle) ([]byte, error) {
+	reader, err := obj.NewReader(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
+
+	data, err := ioutil.ReadAll(reader)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+// notify to slack
+func notifyToSlack(config Config, title string, color string) {
+	// notify to slack
+	api := slack.New(config.slackApiToken)
+	// Notification content
+	attachment := slack.Attachment{
+		Title: title,
+		Color: color,
+		Text:  config.url,
+	}
+	channelID, timestamp, err := api.PostMessage(
+		config.slackChannelId,
+		// slack.MsgOptionText("Hello world!", false),
+		slack.MsgOptionAttachments(attachment),
+	)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+
+	fmt.Printf("Message successfully sent to channel %s at %s\n", channelID, timestamp)
+}
+
 func main() {
 	// check Environment Variables
 	config, err := configFromEnv()
@@ -122,6 +161,13 @@ func main() {
 			} else {
 				log.Fatal(err)
 			}
+		} else {
+			// オブジェクトが存在する場合は、読み込む
+			data, err := readObject(ctx, obj)
+			fmt.Printf("オブジェクトの内容: %s\n", data)
+			if err != nil {
+				log.Fatal(err)
+			}
 		}
 	}
 
@@ -136,26 +182,9 @@ func main() {
 
 	// status code not 200
 	if resp.StatusCode != http.StatusOK {
-		// notiry to slack
-		api := slack.New(config.slackApiToken)
-		// Notification content
-		attachment := slack.Attachment{
-			Title: "サーバがダウンしました",
-			Color: "danger",
-			Text:  config.url,
-		}
-		channelID, timestamp, err := api.PostMessage(
-			config.slackChannelId,
-			// slack.MsgOptionText("Hello world!", false),
-			slack.MsgOptionAttachments(attachment),
-		)
-		if err != nil {
-			fmt.Printf("Slack Post Message Error %s\n", err)
-			return
-		}
-
-		fmt.Printf("Message successfully sent to channel %s at %s\n", channelID, timestamp)
-
+		notifyToSlack(config, "サーバがダウンしています", "danger")
+	} else {
+		notifyToSlack(config, "サーバが復帰しました", "good")
 	}
 
 }
