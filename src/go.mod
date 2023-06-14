@@ -3,6 +3,7 @@ module status-check-notify-slack/main
 go 1.19
 
 require (
+	cloud.google.com/go/pubsub v1.28.0
 	cloud.google.com/go/storage v1.30.1
 	github.com/slack-go/slack v0.12.2
 )
@@ -22,6 +23,7 @@ require (
 	go.opencensus.io v0.24.0 // indirect
 	golang.org/x/net v0.8.0 // indirect
 	golang.org/x/oauth2 v0.6.0 // indirect
+	golang.org/x/sync v0.1.0 // indirect
 	golang.org/x/sys v0.6.0 // indirect
 	golang.org/x/text v0.8.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect

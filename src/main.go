@@ -12,6 +12,7 @@ import (
 	"os"
 	"strings"
 
+	"cloud.google.com/go/pubsub"
 	"cloud.google.com/go/storage"
 )
 
@@ -21,6 +22,8 @@ type Config struct {
 	slackApiToken  string // SLACK_API_TOKEN
 	slackChannelId string // SLACK_CHANNEL_ID
 	bucketName     string // BUCKET_NAME
+	projectId      string // PROJECT_ID
+	topicId        string // TOPIC_ID
 }
 
 // get Environment Variables
@@ -29,6 +32,8 @@ func configFromEnv() (Config, error) {
 	slackApiToken := os.Getenv("SLACK_API_TOKEN")
 	slackChannelId := os.Getenv("SLACK_CHANNEL_ID")
 	bucketName := os.Getenv("BUCKET_NAME")
+	projectId := os.Getenv("PROJECT_ID")
+	topicId := os.Getenv("TOPIC_ID")
 
 	// set config from Environment Variables
 	config := Config{
@@ -36,6 +41,8 @@ func configFromEnv() (Config, error) {
 		slackApiToken:  slackApiToken,
 		slackChannelId: slackChannelId,
 		bucketName:     bucketName,
+		projectId:      projectId,
+		topicId:        topicId,
 	}
 
 	// check Environment Variables
@@ -50,6 +57,12 @@ func configFromEnv() (Config, error) {
 	}
 	// if config.bucketName == "" {
 	// 	return config, errors.New("BUCKET_NAME is not set")
+	// }
+	// if config.projectId == "" {
+	// 	return config, errors.New("PROJECT_ID is not set")
+	// }
+	// if config.topicId == "" {
+	// 	return config, errors.New("TOPIC_ID is not set")
 	// }
 
 	return config, nil
@@ -140,6 +153,30 @@ func notifyToSlack(config Config, title string, color string) {
 	fmt.Printf("Message successfully sent to channel %s at %s\n", channelID, timestamp)
 }
 
+// メッセージを指定のトピックに非同期で送信する
+func publishMessage(projectID, topicID string, message *pubsub.Message) (messageId string, err error) {
+	// Pub/Subクライアントの作成
+	ctx := context.Background()
+	client, err := pubsub.NewClient(ctx, projectID)
+	if err != nil {
+		return messageId, fmt.Errorf("Failed to create Pub/Sub client: %v", err)
+	}
+
+	// 既存のトピックを取得
+	topic := client.Topic(topicID)
+
+	// メッセージを非同期で送信
+	publishResult := topic.Publish(ctx, message)
+
+	// Publish結果のエラーチェック
+	messageId, err = publishResult.Get(ctx)
+	if err != nil {
+		return messageId, fmt.Errorf("Failed to get publish result: %v", err)
+	}
+
+	return messageId, nil
+}
+
 func main() {
 	// check Environment Variables
 	config, err := configFromEnv()
@@ -201,9 +238,27 @@ func main() {
 		if config.bucketName != "" {
 			updateObject(ctx, obj, []byte(resp.Status))
 		}
+
+		// config.topicId が存在する場合は、Pub/Subに通知する
+		if config.topicId != "" {
+			// メッセージを作成
+			message := &pubsub.Message{
+				Data: []byte(config.url),
+			}
+
+			// メッセージを非同期で送信
+			messageID, err := publishMessage(config.projectId, config.topicId, message)
+			if err != nil {
+				log.Fatalf("Failed to publish message: %v", err)
+			}
+
+			fmt.Printf("Message published: %s\n", messageID)
+		}
+
 	} else {
 		// status code 200
 		if config.bucketName != "" {
+			// オブジェクトの内容がstatus codeと異なる場合は、更新する
 			if string(objResponseStatus) != resp.Status {
 				notifyToSlack(config, "サーバが復帰しました", "good")
 				updateObject(ctx, obj, []byte(resp.Status))

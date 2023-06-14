@@ -8,7 +8,8 @@ Slack notification if the URL status code is other than 200.
 |  SLACK_API_TOKEN  |  XXXXXXXXXXXXXX  |
 |  SLACK_CHANNEL_ID  |  XXXXXXXXXXXXXX  |
 |  BUCKET_NAME  |  XXXXXXXXXXXXXX  |
-|  TOPIC  |  XXXXXXXXXXXXXX  |
+|  PROJECT_ID  |  XXXXXXXXXXXXXX  |
+|  TOPIC_ID  |  XXXXXXXXXXXXXX  |
 
 ### local env
 ```sh
@@ -16,6 +17,8 @@ set -gx URL https://google.com
 set -gx SLACK_API_TOKEN XXXXXXXXXXXXXX
 set -gx SLACK_CHANNEL_ID XXXXXXXXXXXXXX
 set -gx BUCKET_NAME XXXXXXXXXXXXXX
+set -gx PROJECT_ID XXXXXXXXXXXXXX
+set -gx TOPIC_ID XXXXXXXXXXXXXX
 ```
 
 ## build
